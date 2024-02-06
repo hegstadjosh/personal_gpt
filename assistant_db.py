@@ -34,7 +34,7 @@ def continue_convo():
     c = conn.cursor()
 
     # Fetch all conversations ordered by most recent first
-    c.execute('SELECT id, timestamp, conversation_data, name FROM conversations ORDER BY timestamp DESC')
+    c.execute('SELECT id, timestamp, conversation_data, name FROM conversations ORDER BY id DESC')
     conversations = c.fetchall()
 
     if not conversations:
@@ -49,15 +49,15 @@ def continue_convo():
             #first_message = conversation_data[0]['content'] if conversation_data else 'No Content'
             print(f"{convo[0]}: {convo[3]}")
 
-        print("Enter the ID of the conversation you'd like to continue or type 'cancel':")
+        print("Enter the ID of the conversation you'd like to continue or type 'exit':")
         user_input = input("> ").strip().lower()
-        if user_input == 'cancel':
+        if user_input == 'exit':
             break
         try:
             convo_id = int(user_input)
             # Check if the ID is in the conversations
             if any(convo_id == convo[0] for convo in conversations):
-                # Fetch and display the selected conversation
+                # Fetch and display te selected conversation
                 c.execute('SELECT conversation_data FROM conversations WHERE id = ?', (convo_id,))
                 selected_convo = c.fetchone()
                 if selected_convo:
@@ -70,15 +70,17 @@ def continue_convo():
                     print(f"\nLoad data into assistant? (yes/no)")
                     user_input = input("> ").strip().lower()
                     if user_input == 'yes':
+                        c.execute('DELETE FROM conversations WHERE id = ?', (convo_id,))
+                        conn.commit()
                         conn.close()
                         return conversation_data
                     else:
                         continue
                 break
             else:
-                print("Invalid ID. Please try again or type 'cancel'.")
+                print("Invalid ID. Please try again or type 'exit'.")
         except ValueError:
-            print("Please enter a valid ID or 'cancel'.")
+            print("Please enter a valid ID or 'exit'.")
     
     conn.close()
     return None
