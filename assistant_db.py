@@ -6,6 +6,15 @@ import tools
 conn = sqlite3.connect('personal_gpt.db')
 c = conn.cursor()
 
+# Create table for API keys
+c.execute('''
+    CREATE TABLE IF NOT EXISTS api_values (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL,
+    model TEXT NOT NULL
+)
+''')
+
 # Create table
 c.execute('''
     CREATE TABLE IF NOT EXISTS conversations (
@@ -15,6 +24,52 @@ c.execute('''
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 )
 ''')
+
+conn.commit()
+
+# def check_model():
+#     c.execute("SELECT model FROM api_values")
+#     data = c.fetchone()
+#     if data is None:
+#         return change_model()
+#     else:
+#         return data[2]
+
+def get_model():
+    c.execute("SELECT model FROM api_values WHERE id = 1")
+    data = c.fetchone()
+    if data is not None:
+        return data[0]
+    else:
+        print("No model found.")
+        return None
+    
+def change_model():
+    print("Enter the model you'd like to use")
+    print("ex. gpt-4-0125-preview (turbo), gpt-3.5-turbo-0125	")
+    model = input("> ")
+    if(model.strip() == ""):
+        return get_model()
+    c.execute("UPDATE api_values SET model = ? WHERE id = 1", (model,))
+    conn.commit()
+    return model
+
+def check_api_key():
+    c.execute("SELECT * FROM api_values")
+    data = c.fetchone()
+    if data is None:
+        return change_api_key(1)
+    else:
+        return data[1]
+
+def change_api_key(x = 0): #if initializing, pass x = 1
+    api_key = input("Please enter your API key: ")
+    if(x == 1):
+        c.execute("INSERT INTO api_values (key, model) VALUES (?, ?)", (api_key, "gpt-4-0125-preview"))
+    else:
+        c.execute("UPDATE api_values SET key = ? WHERE id = 1",  (api_key,))
+    conn.commit()
+    return api_key
 
 # Function to add entry
 def add_entry(messages, convo_name):

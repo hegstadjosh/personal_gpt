@@ -1,5 +1,6 @@
 from termcolor import colored
-
+# import openai
+# import assistant_db
 
 def pretty_print_message(message):
   """
@@ -28,3 +29,12 @@ def pretty_print_message(message):
     print(colored(f"assistant: {message['content']}\n", role_to_color[message["role"]]))
   elif message["role"] == "tool":
     print(colored(f"function ({message['name']}): {message['content']}\n", role_to_color[message["role"]]))
+
+# def is_valid_api_key(api_key):
+#     try:
+#         openai.api_key = api_key
+#         openai.Completion.create(engine="text-davinci-002", prompt="test", max_tokens=5)
+#         return api_key
+#     except openai.OpenAIError:
+#         print("Invalid API key...")
+#         return assistant_db.change_api_key()

@@ -1,19 +1,17 @@
 import os
 import openai
 from openai import OpenAI
-import json
 import requests
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 from termcolor import colored
-import g4f
 import assistant_db
 import tools
 from datetime import datetime
 
 client = OpenAI()
-GPT_MODEL = "gpt-4-0125-preview"
+openai.api_key =  (assistant_db.check_api_key())
+GPT_MODEL = assistant_db.get_model()
 
-openai.api_key =  ""
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
 def chat_completion_request(messages, tools=None, tool_choice=None, model=GPT_MODEL):
     #
@@ -75,6 +73,8 @@ def assistant_loop(messages):
     print("AI ASSISTANT AT YOUR SERVICE.")
     print("'continue' to load a previous conversation.")
     print("'system' to change the AI's system message.")
+    print("'model' to change the AI's model.")
+    print("'key' to change the API key.")
     print("'file' to interact with a txt file.")
     print("'exit' to end the conversation (auto-saves to database).")
     print("'save' to save the conversation to .txt file.")
@@ -87,6 +87,20 @@ def assistant_loop(messages):
                 messages = old_messages
                 print("\n\n------------------------------Conversation loaded.\n\n")
             continue
+        if(user_input == "model"):
+            global GPT_MODEL 
+            print("Current model: " + GPT_MODEL)
+            GPT_MODEL = assistant_db.change_model()
+            continue
+        if(user_input == "key"):
+            openai.api_key = assistant_db.change_api_key()
+            continue
+        if(user_input == "system"):
+            messages = change_system_message(messages)
+            user_input = input("> ")
+        if(user_input == "file"):
+            file_interaction(messages)
+            continue
         if(user_input == "exit"):
             assistant_db.add_entry(messages, name_convo(messages))
             break
@@ -94,12 +108,7 @@ def assistant_loop(messages):
             assistant_db.add_entry(messages, name_convo(messages))
             save_to_file(messages)
             break
-        if(user_input =="system"):
-            messages = change_system_message(messages)
-            user_input = input("...")
-        if(user_input == "file"):
-            file_interaction(messages)
-            continue
+
         messages.append({"role": "user", "content": user_input})
         chat_response = chat_completion_request(
             messages=messages
@@ -159,7 +168,6 @@ def change_system_message(messages):
     {"role": "system", "content": new_msg},
    ]
    return messages
-
 
 
 
