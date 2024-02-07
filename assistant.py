@@ -7,11 +7,13 @@ from termcolor import colored
 import assistant_db
 import tools
 from datetime import datetime
+import fitz
 
 client = OpenAI()
 openai.api_key =  (assistant_db.check_api_key())
 GPT_MODEL = assistant_db.get_model()
 
+#chat_completion_request taken from https://cookbook.openai.com/examples/how_to_call_functions_with_chat_models#how-to-call-functions-with-model-generated-arguments
 @retry(wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3))
 def chat_completion_request(messages, tools=None, tool_choice=None, model=GPT_MODEL):
     #
@@ -50,7 +52,7 @@ def chat_completion_request(messages, tools=None, tool_choice=None, model=GPT_MO
     
 def conversation_to_file(messages, file_name):
     current_date = datetime.now().strftime("%m_%d_%y")
-    file_path = "Conversations/" + current_date + "_" + file_name  + ".txt"
+    file_path = current_date + "_" + file_name  + ".txt"
     #file_path = "/Users/socce/Desktop/Personal GPT/Conversations/" + file_name + "_" + current_date + ".txt"
     with open(file_path, 'w') as f:
         for message in messages:
@@ -124,11 +126,20 @@ def assistant_loop(messages):
 
 
 def read_file(messages, file_path):
+    file_path = file_path.replace("\\", "/")
+    file_path = file_path.replace('"', "")
     if not os.path.exists(file_path):
       print("File does not exist.")
       return -1
-    with open(file_path, 'r') as file:
-        messages.append({"role": "user", "content": "<START_FILE>" + file.read() + "<END_FILE>"})
+    
+    if file_path.endswith(".pdf"):
+        txt_output_path = file_path.replace(".pdf", ".txt")
+        parse_pdf_to_txt(file_path, txt_output_path)
+        with open(txt_output_path, 'r') as file:
+            messages.append({"role": "user", "content": "<START_FILE>" + file.read() + "<END_FILE>"})
+    else: 
+        with open(file_path, 'r') as file:
+            messages.append({"role": "user", "content": "<START_FILE>" + file.read() + "<END_FILE>"})
   
 def file_interaction(messages):
     file_name = input("File path: ")
@@ -157,6 +168,22 @@ def name_convo(messages):
     del messages[-1]
     return file_name
 
+def parse_pdf_to_txt(pdf_file_path, txt_output_path):
+    # Open the PDF file
+    pdf_document = fitz.open(pdf_file_path)
+
+    text_content = ""
+
+    # Iterate through each page in the PDF document
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        text_content += page.get_text()
+
+    # Write the extracted text content to a .txt file
+    with open(txt_output_path, 'w', encoding='utf-8') as txt_file:
+        txt_file.write(text_content)
+
+    pdf_document.close()
 def save_to_file(messages):
     file_name = name_convo(messages)
 
