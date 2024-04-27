@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+import pprint
 import sqlite3
 import json
 import tools
@@ -6,7 +7,7 @@ import tools
 conn = sqlite3.connect('personal_gpt.db')
 c = conn.cursor()
 
-# Create table for API keys
+# Create api key table
 c.execute('''
     CREATE TABLE IF NOT EXISTS api_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,7 +16,7 @@ c.execute('''
 )
 ''')
 
-# Create table
+# Create conversation table
 c.execute('''
     CREATE TABLE IF NOT EXISTS conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,15 +26,20 @@ c.execute('''
 )
 ''')
 
+# Create notifcations table
+c.execute('''
+    CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    scheduled_time DATETIME NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'sent')),
+    FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
+)
+''')
+
 conn.commit()
 
-# def check_model():
-#     c.execute("SELECT model FROM api_values")
-#     data = c.fetchone()
-#     if data is None:
-#         return change_model()
-#     else:
-#         return data[2]
 
 def get_model():
     c.execute("SELECT model FROM api_values WHERE id = 1")
@@ -83,6 +89,22 @@ def add_entry(messages, convo_name):
 def get_entries():
     c.execute("SELECT * FROM chats")
     return c.fetchall()
+def get_conversation(id):
+    c.execute("SELECT * FROM conversations WHERE id=?", (id,))
+    return c.fetchone()
+def get_max_id():
+    # Connect to the SQLite database
+    conn = sqlite3.connect('personal_gpt.db')
+    # Create a cursor object
+    c = conn.cursor()
+    # Execute the query to find the maximum conversation id
+    c.execute("SELECT MAX(id) FROM conversations")
+    # Fetch the result
+    max_id = c.fetchone()[0]
+    # Close the connection
+    conn.close()
+    # Return the current conversation id
+    return max_id if max_id else 0
 
 def continue_convo():
     conn = sqlite3.connect('personal_gpt.db')
@@ -139,3 +161,57 @@ def continue_convo():
     
     conn.close()
     return None
+
+#NOTIFICATION FUNCTIONS
+# Schedule a reminder into the database
+def set_reminder(conversation_id, content, scheduled_time = 0, offset_time = 0):
+    """Function to schedule a reminder with given content at a scheduled time."""
+    try:
+        if offset_time:
+            scheduled_time = (datetime.now() + timedelta(minutes=offset_time)).strftime("%Y-%m-%d %H:%M:%S")
+        
+        with sqlite3.connect('personal_gpt.db') as conn:
+            c = conn.cursor()
+            c.execute("""
+                INSERT INTO notifications (conversation_id, content, scheduled_time, status)
+                VALUES (?, ?, ?, 'pending')
+            """, (conversation_id, content, scheduled_time))
+            conn.commit()
+        return "Reminder scheduled successfully."
+    except Exception as e:
+        return f"Failed to schedule reminder with error: {e}"
+
+# Function to get pending notifications
+def get_pending_notifications(current_time):
+    with sqlite3.connect('personal_gpt.db') as conn:
+        c = conn.cursor()
+        c.execute("SELECT id, content FROM notifications WHERE scheduled_time <= ? AND status = 'pending'", (current_time,))
+        return c.fetchall()
+    
+# Function to mark a notification as sent
+def mark_notification_as_sent(notification_id):
+    with sqlite3.connect('personal_gpt.db') as conn:
+        c = conn.cursor()
+        c.execute("UPDATE notifications SET status = 'sent' WHERE id = ?", (notification_id,))
+        conn.commit()
+
+from plyer import notification
+
+def send_notification(title, message):
+    # Show the notification
+    notification.notify(
+        title=title,
+        message=message,
+        app_name='Assistant',
+        timeout=20,  # Notification stays
+    )
+
+def send_ready_notifications():
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    pending_notifications = get_pending_notifications(current_time)
+    for notification_id, content in pending_notifications:
+        send_notification('Reminder', content)
+        mark_notification_as_sent(notification_id)
+    return len(pending_notifications)
+
+send_ready_notifications()

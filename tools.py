@@ -1,7 +1,4 @@
 from termcolor import colored
-# import openai
-# import assistant_db
-
 #pretty_print_message derived from https://cookbook.openai.com/examples/how_to_call_functions_with_chat_models#how-to-call-functions-with-model-generated-arguments
 def pretty_print_message(message):
   """
